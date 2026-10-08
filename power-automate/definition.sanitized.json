@@ -1,0 +1,596 @@
+{
+  "name": "e80f4891-9ea8-410c-9eb5-4c1e7ee1553e",
+  "id": "/providers/Microsoft.Flow/flows/e80f4891-9ea8-410c-9eb5-4c1e7ee1553e",
+  "type": "Microsoft.Flow/flows",
+  "properties": {
+    "apiId": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+    "displayName": "Retail Store Request Automation PoC",
+    "definition": {
+      "metadata": {
+        "workflowEntityId": null,
+        "processAdvisorMetadata": null,
+        "flowChargedByPaygo": null,
+        "flowclientsuspensionreason": "None",
+        "flowclientsuspensiontime": null,
+        "flowclientsuspensionreasondetails": null,
+        "creator": {
+          "id": "99360b7a-5ac0-4623-ac6c-4b870249bad0",
+          "type": "User",
+          "tenantId": "078bb4ce-1612-4c77-87ad-d1dcb32abe76"
+        },
+        "provisioningMethod": "FromDefinition",
+        "failureAlertSubscription": true,
+        "clientLastModifiedTime": "2026-10-08T13:01:50.0270228Z",
+        "lastModifiedBy": "99360b7a-5ac0-4623-ac6c-4b870249bad0",
+        "connectionKeySavedTimeKey": "2026-10-08T13:01:50.0270228Z",
+        "creationSource": "Portal",
+        "modifiedSources": "Portal"
+      },
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "undefined",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        }
+      },
+      "triggers": {
+        "manual": {
+          "type": "Request",
+          "kind": "Button",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {},
+              "required": []
+            }
+          }
+        }
+      },
+      "actions": {
+        "List_rows_present_in_a_table": {
+          "runAfter": {},
+          "metadata": {
+            "01B6VHKF72WLIR4XL5AJG2WKFEY2PEN37N": "/Retail Store Request Automation/Retail_Store_Request_Prototype.xlsx",
+            "tableId": "{00000000-000C-0000-FFFF-FFFF00000000}"
+          },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "source": "me",
+              "drive": "<ONEDRIVE_DRIVE_ID>",
+              "file": "<EXCEL_FILE_ID>",
+              "table": "{00000000-000C-0000-FFFF-FFFF00000000}"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
+              "connectionName": "shared_excelonlinebusiness",
+              "operationId": "GetItems"
+            },
+            "authentication": {
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']",
+              "type": "Raw"
+            }
+          }
+        },
+        "Apply_to_each": {
+          "foreach": "@outputs('List_rows_present_in_a_table')?['body/value']",
+          "actions": {
+            "Cost_over_500": {
+              "actions": {
+                "Request_manager_approval": {
+                  "type": "OpenApiConnectionWebhook",
+                  "inputs": {
+                    "parameters": {
+                      "approvalType": "Basic",
+                      "WebhookApprovalCreationInput/title": "@concat(\r\n  'Approval required - ',\r\n  items('Apply_to_each')?['Request ID'],\r\n  ' - €',\r\n  string(items('Apply_to_each')?['Estimated Cost EUR'])\r\n)",
+                      "WebhookApprovalCreationInput/assignedTo": "automation.owner@example.com",
+                      "WebhookApprovalCreationInput/details": "@concat('**Store:** ', items('Apply_to_each')?['Store'], decodeUriComponent('%0A%0A'), '**Category:** ', items('Apply_to_each')?['Request Category'], decodeUriComponent('%0A%0A'), '**Priority:** ', items('Apply_to_each')?['Priority'], decodeUriComponent('%0A%0A'), '**Description:** ', items('Apply_to_each')?['Description'], decodeUriComponent('%0A%0A'), '**Estimated Cost:** €', string(items('Apply_to_each')?['Estimated Cost EUR']))",
+                      "WebhookApprovalCreationInput/enableNotifications": true,
+                      "WebhookApprovalCreationInput/enableReassignment": true
+                    },
+                    "host": {
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_approvals",
+                      "connectionName": "shared_approvals",
+                      "operationId": "StartAndWaitForAnApproval"
+                    },
+                    "authentication": {
+                      "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']",
+                      "type": "Raw"
+                    }
+                  }
+                },
+                "Approval_is_Approve": {
+                  "actions": {
+                    "Set_status_Approved": {
+                      "metadata": {
+                        "01B6VHKF72WLIR4XL5AJG2WKFEY2PEN37N": "/Retail Store Request Automation/Retail_Store_Request_Prototype.xlsx"
+                      },
+                      "type": "OpenApiConnection",
+                      "inputs": {
+                        "parameters": {
+                          "source": "me",
+                          "drive": "<ONEDRIVE_DRIVE_ID>",
+                          "file": "<EXCEL_FILE_ID>",
+                          "table": "{00000000-000C-0000-FFFF-FFFF00000000}",
+                          "idColumn": "Request ID",
+                          "id": "@items('Apply_to_each')?['Request ID']",
+                          "item/Status": "Approved"
+                        },
+                        "host": {
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
+                          "connectionName": "shared_excelonlinebusiness",
+                          "operationId": "PatchItem"
+                        },
+                        "authentication": {
+                          "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']",
+                          "type": "Raw"
+                        }
+                      }
+                    },
+                    "Route_Approved_IT": {
+                      "actions": {
+                        "Approved_Email_IT": {
+                          "type": "OpenApiConnection",
+                          "inputs": {
+                            "parameters": {
+                              "emailMessage/To": "automation.owner@example.com",
+                              "emailMessage/Subject": "Retail Store Request Automation - Approved IT Request",
+                              "emailMessage/Body": "<p class=\"editor-paragraph\">@{concat(\r\n  'New approved IT request received<br><br>',\r\n  '<b>Request ID:</b> ', items('Apply_to_each')?['Request ID'], '<br>',\r\n  '<b>Store:</b> ', items('Apply_to_each')?['Store'], '<br>',\r\n  '<b>Priority:</b> ', items('Apply_to_each')?['Priority'], '<br>',\r\n  '<b>Description:</b> ', items('Apply_to_each')?['Description'], '<br>',\r\n  '<b>Estimated Cost:</b> €', string(items('Apply_to_each')?['Estimated Cost EUR']), '<br>',\r\n  '<b>Status:</b> ', 'Approved'\r\n)}</p>",
+                              "emailMessage/Importance": "Normal"
+                            },
+                            "host": {
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                              "connectionName": "shared_office365",
+                              "operationId": "SendEmailV2"
+                            },
+                            "authentication": {
+                              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']",
+                              "type": "Raw"
+                            }
+                          }
+                        }
+                      },
+                      "else": {
+                        "actions": {
+                          "Approved_Route_Equipment": {
+                            "actions": {
+                              "Approved_Email_Equipment": {
+                                "type": "OpenApiConnection",
+                                "inputs": {
+                                  "parameters": {
+                                    "emailMessage/To": "automation.owner@example.com",
+                                    "emailMessage/Subject": "Retail Store Request Automation - Approved Equipment Request",
+                                    "emailMessage/Body": "<p class=\"editor-paragraph\">@{concat(\r\n  'New approved Equipment request received<br><br>',\r\n  '<b>Request ID:</b> ', items('Apply_to_each')?['Request ID'], '<br>',\r\n  '<b>Store:</b> ', items('Apply_to_each')?['Store'], '<br>',\r\n  '<b>Priority:</b> ', items('Apply_to_each')?['Priority'], '<br>',\r\n  '<b>Description:</b> ', items('Apply_to_each')?['Description'], '<br>',\r\n  '<b>Estimated Cost:</b> €', string(items('Apply_to_each')?['Estimated Cost EUR']), '<br>',\r\n  '<b>Status:</b> ', 'Approved'\r\n)}</p>",
+                                    "emailMessage/Importance": "Normal"
+                                  },
+                                  "host": {
+                                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                    "connectionName": "shared_office365",
+                                    "operationId": "SendEmailV2"
+                                  },
+                                  "authentication": {
+                                    "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']",
+                                    "type": "Raw"
+                                  }
+                                }
+                              }
+                            },
+                            "else": {
+                              "actions": {
+                                "Approved_Route_Marketing": {
+                                  "actions": {
+                                    "Approved_Email_Marketing": {
+                                      "type": "OpenApiConnection",
+                                      "inputs": {
+                                        "parameters": {
+                                          "emailMessage/To": "automation.owner@example.com",
+                                          "emailMessage/Subject": "Retail Store Request Automation - Approved Marketing Request",
+                                          "emailMessage/Body": "<p class=\"editor-paragraph\">@{concat(\r\n  'New approved Marketing request received<br><br>',\r\n  '<b>Request ID:</b> ', items('Apply_to_each')?['Request ID'], '<br>',\r\n  '<b>Store:</b> ', items('Apply_to_each')?['Store'], '<br>',\r\n  '<b>Priority:</b> ', items('Apply_to_each')?['Priority'], '<br>',\r\n  '<b>Description:</b> ', items('Apply_to_each')?['Description'], '<br>',\r\n  '<b>Estimated Cost:</b> €', string(items('Apply_to_each')?['Estimated Cost EUR']), '<br>',\r\n  '<b>Status:</b> ', 'Approved'\r\n)}</p>",
+                                          "emailMessage/Importance": "Normal"
+                                        },
+                                        "host": {
+                                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                          "connectionName": "shared_office365",
+                                          "operationId": "SendEmailV2"
+                                        },
+                                        "authentication": {
+                                          "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']",
+                                          "type": "Raw"
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "else": {
+                                    "actions": {
+                                      "Approved_Route_Maintenance": {
+                                        "actions": {
+                                          "Approved_Email_Maintenance": {
+                                            "type": "OpenApiConnection",
+                                            "inputs": {
+                                              "parameters": {
+                                                "emailMessage/To": "automation.owner@example.com",
+                                                "emailMessage/Subject": "Retail Store Request Automation - Approved Maintenance Request",
+                                                "emailMessage/Body": "<p class=\"editor-paragraph\">@{concat(\r\n  'New approved Maintenance request received<br><br>',\r\n  '<b>Request ID:</b> ', items('Apply_to_each')?['Request ID'], '<br>',\r\n  '<b>Store:</b> ', items('Apply_to_each')?['Store'], '<br>',\r\n  '<b>Priority:</b> ', items('Apply_to_each')?['Priority'], '<br>',\r\n  '<b>Description:</b> ', items('Apply_to_each')?['Description'], '<br>',\r\n  '<b>Estimated Cost:</b> €', string(items('Apply_to_each')?['Estimated Cost EUR']), '<br>',\r\n  '<b>Status:</b> ', 'Approved'\r\n)}</p>",
+                                                "emailMessage/Importance": "Normal"
+                                              },
+                                              "host": {
+                                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                                "connectionName": "shared_office365",
+                                                "operationId": "SendEmailV2"
+                                              },
+                                              "authentication": {
+                                                "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']",
+                                                "type": "Raw"
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "else": {
+                                          "actions": {
+                                            "Approved_Email_Other": {
+                                              "type": "OpenApiConnection",
+                                              "inputs": {
+                                                "parameters": {
+                                                  "emailMessage/To": "automation.owner@example.com",
+                                                  "emailMessage/Subject": "Retail Store Request Automation - Approved Other Request",
+                                                  "emailMessage/Body": "<p class=\"editor-paragraph\">@{concat(\r\n  'New approved Other request received<br><br>',\r\n  '<b>Request ID:</b> ', items('Apply_to_each')?['Request ID'], '<br>',\r\n  '<b>Store:</b> ', items('Apply_to_each')?['Store'], '<br>',\r\n  '<b>Category:</b> ', items('Apply_to_each')?['Request Category'], '<br>',\r\n  '<b>Priority:</b> ', items('Apply_to_each')?['Priority'], '<br>',\r\n  '<b>Description:</b> ', items('Apply_to_each')?['Description'], '<br>',\r\n  '<b>Estimated Cost:</b> €', string(items('Apply_to_each')?['Estimated Cost EUR']), '<br>',\r\n  '<b>Status:</b> ', 'Approved'\r\n)}</p>",
+                                                  "emailMessage/Importance": "Normal"
+                                                },
+                                                "host": {
+                                                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                                  "connectionName": "shared_office365",
+                                                  "operationId": "SendEmailV2"
+                                                },
+                                                "authentication": {
+                                                  "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']",
+                                                  "type": "Raw"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "expression": {
+                                          "and": [
+                                            {
+                                              "equals": [
+                                                "@items('Apply_to_each')?['Request Category']",
+                                                "Maintenance"
+                                              ]
+                                            }
+                                          ]
+                                        },
+                                        "type": "If"
+                                      }
+                                    }
+                                  },
+                                  "expression": {
+                                    "and": [
+                                      {
+                                        "equals": [
+                                          "@items('Apply_to_each')?['Request Category']",
+                                          "Marketing"
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  "type": "If"
+                                }
+                              }
+                            },
+                            "expression": {
+                              "and": [
+                                {
+                                  "equals": [
+                                    "@items('Apply_to_each')?['Request Category']",
+                                    "Equipment"
+                                  ]
+                                }
+                              ]
+                            },
+                            "type": "If"
+                          }
+                        }
+                      },
+                      "expression": {
+                        "and": [
+                          {
+                            "equals": [
+                              "@items('Apply_to_each')?['Request Category']",
+                              "IT"
+                            ]
+                          }
+                        ]
+                      },
+                      "type": "If",
+                      "runAfter": {
+                        "Set_status_Approved": [
+                          "Succeeded"
+                        ]
+                      }
+                    }
+                  },
+                  "runAfter": {
+                    "Request_manager_approval": [
+                      "Succeeded"
+                    ]
+                  },
+                  "else": {
+                    "actions": {
+                      "Set_status_Rejected": {
+                        "metadata": {
+                          "01B6VHKF72WLIR4XL5AJG2WKFEY2PEN37N": "/Retail Store Request Automation/Retail_Store_Request_Prototype.xlsx"
+                        },
+                        "type": "OpenApiConnection",
+                        "inputs": {
+                          "parameters": {
+                            "source": "me",
+                            "drive": "<ONEDRIVE_DRIVE_ID>",
+                            "file": "<EXCEL_FILE_ID>",
+                            "table": "{00000000-000C-0000-FFFF-FFFF00000000}",
+                            "idColumn": "Request ID",
+                            "id": "@items('Apply_to_each')?['Request ID']",
+                            "item/Status": "Rejected"
+                          },
+                          "host": {
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
+                            "connectionName": "shared_excelonlinebusiness",
+                            "operationId": "PatchItem"
+                          },
+                          "authentication": {
+                            "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']",
+                            "type": "Raw"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "expression": {
+                    "and": [
+                      {
+                        "equals": [
+                          "@body('Request_manager_approval')?['outcome']",
+                          "Approve"
+                        ]
+                      }
+                    ]
+                  },
+                  "type": "If"
+                }
+              },
+              "else": {
+                "actions": {
+                  "Route_NoApproval_IT": {
+                    "actions": {
+                      "NoApproval_Email_IT": {
+                        "type": "OpenApiConnection",
+                        "inputs": {
+                          "parameters": {
+                            "emailMessage/To": "automation.owner@example.com",
+                            "emailMessage/Subject": "Retail Store Request Automation - IT Request",
+                            "emailMessage/Body": "<p class=\"editor-paragraph\">@{concat(\r\n  'New IT request received<br><br>',\r\n  '<b>Request ID:</b> ', items('Apply_to_each')?['Request ID'], '<br>',\r\n  '<b>Store:</b> ', items('Apply_to_each')?['Store'], '<br>',\r\n  '<b>Priority:</b> ', items('Apply_to_each')?['Priority'], '<br>',\r\n  '<b>Description:</b> ', items('Apply_to_each')?['Description'], '<br>',\r\n  '<b>Estimated Cost:</b> €', string(items('Apply_to_each')?['Estimated Cost EUR']), '<br>',\r\n  '<b>Status:</b> ', items('Apply_to_each')?['Status']\r\n)}</p>",
+                            "emailMessage/Importance": "Normal"
+                          },
+                          "host": {
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                            "connectionName": "shared_office365",
+                            "operationId": "SendEmailV2"
+                          },
+                          "authentication": {
+                            "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']",
+                            "type": "Raw"
+                          }
+                        }
+                      }
+                    },
+                    "else": {
+                      "actions": {
+                        "NoApproval_Route_Equipment": {
+                          "actions": {
+                            "NoApproval_Email_Equipment": {
+                              "type": "OpenApiConnection",
+                              "inputs": {
+                                "parameters": {
+                                  "emailMessage/To": "automation.owner@example.com",
+                                  "emailMessage/Subject": "Retail Store Request Automation - Equipment Request",
+                                  "emailMessage/Body": "<p class=\"editor-paragraph\">@{concat(\r\n  'New Equipment request received<br><br>',\r\n  '<b>Request ID:</b> ', items('Apply_to_each')?['Request ID'], '<br>',\r\n  '<b>Store:</b> ', items('Apply_to_each')?['Store'], '<br>',\r\n  '<b>Priority:</b> ', items('Apply_to_each')?['Priority'], '<br>',\r\n  '<b>Description:</b> ', items('Apply_to_each')?['Description'], '<br>',\r\n  '<b>Estimated Cost:</b> €', string(items('Apply_to_each')?['Estimated Cost EUR']), '<br>',\r\n  '<b>Status:</b> ', items('Apply_to_each')?['Status']\r\n)}</p>",
+                                  "emailMessage/Importance": "Normal"
+                                },
+                                "host": {
+                                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                  "connectionName": "shared_office365",
+                                  "operationId": "SendEmailV2"
+                                },
+                                "authentication": {
+                                  "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']",
+                                  "type": "Raw"
+                                }
+                              }
+                            }
+                          },
+                          "else": {
+                            "actions": {
+                              "NoApproval_Route_Marketing": {
+                                "actions": {
+                                  "NoApproval_Email_Marketing": {
+                                    "type": "OpenApiConnection",
+                                    "inputs": {
+                                      "parameters": {
+                                        "emailMessage/To": "automation.owner@example.com",
+                                        "emailMessage/Subject": "Retail Store Request Automation - Marketing Request",
+                                        "emailMessage/Body": "<p class=\"editor-paragraph\">@{concat(\r\n  'New Marketing request received<br><br>',\r\n  '<b>Request ID:</b> ', items('Apply_to_each')?['Request ID'], '<br>',\r\n  '<b>Store:</b> ', items('Apply_to_each')?['Store'], '<br>',\r\n  '<b>Priority:</b> ', items('Apply_to_each')?['Priority'], '<br>',\r\n  '<b>Description:</b> ', items('Apply_to_each')?['Description'], '<br>',\r\n  '<b>Estimated Cost:</b> €', string(items('Apply_to_each')?['Estimated Cost EUR']), '<br>',\r\n  '<b>Status:</b> ', items('Apply_to_each')?['Status']\r\n)}</p>",
+                                        "emailMessage/Importance": "Normal"
+                                      },
+                                      "host": {
+                                        "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                        "connectionName": "shared_office365",
+                                        "operationId": "SendEmailV2"
+                                      },
+                                      "authentication": {
+                                        "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']",
+                                        "type": "Raw"
+                                      }
+                                    }
+                                  }
+                                },
+                                "else": {
+                                  "actions": {
+                                    "NoApproval_Route_Maintenance": {
+                                      "actions": {
+                                        "NoApproval_Email_Maintenance": {
+                                          "type": "OpenApiConnection",
+                                          "inputs": {
+                                            "parameters": {
+                                              "emailMessage/To": "automation.owner@example.com",
+                                              "emailMessage/Subject": "Retail Store Request Automation - Maintenance Request",
+                                              "emailMessage/Body": "<p class=\"editor-paragraph\">@{concat(\r\n  'New Maintenance request received<br><br>',\r\n  '<b>Request ID:</b> ', items('Apply_to_each')?['Request ID'], '<br>',\r\n  '<b>Store:</b> ', items('Apply_to_each')?['Store'], '<br>',\r\n  '<b>Priority:</b> ', items('Apply_to_each')?['Priority'], '<br>',\r\n  '<b>Description:</b> ', items('Apply_to_each')?['Description'], '<br>',\r\n  '<b>Estimated Cost:</b> €', string(items('Apply_to_each')?['Estimated Cost EUR']), '<br>',\r\n  '<b>Status:</b> ', items('Apply_to_each')?['Status']\r\n)}</p>",
+                                              "emailMessage/Importance": "Normal"
+                                            },
+                                            "host": {
+                                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                              "connectionName": "shared_office365",
+                                              "operationId": "SendEmailV2"
+                                            },
+                                            "authentication": {
+                                              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']",
+                                              "type": "Raw"
+                                            }
+                                          }
+                                        }
+                                      },
+                                      "else": {
+                                        "actions": {
+                                          "NoApproval_Email_Other": {
+                                            "type": "OpenApiConnection",
+                                            "inputs": {
+                                              "parameters": {
+                                                "emailMessage/To": "automation.owner@example.com",
+                                                "emailMessage/Subject": "Retail Store Request Automation - Other Request",
+                                                "emailMessage/Body": "<p class=\"editor-paragraph\">@{concat(\r\n  'New Other request received<br><br>',\r\n  '<b>Request ID:</b> ', items('Apply_to_each')?['Request ID'], '<br>',\r\n  '<b>Store:</b> ', items('Apply_to_each')?['Store'], '<br>',\r\n  '<b>Category:</b> ', items('Apply_to_each')?['Request Category'], '<br>',\r\n  '<b>Priority:</b> ', items('Apply_to_each')?['Priority'], '<br>',\r\n  '<b>Description:</b> ', items('Apply_to_each')?['Description'], '<br>',\r\n  '<b>Estimated Cost:</b> €', string(items('Apply_to_each')?['Estimated Cost EUR']), '<br>',\r\n  '<b>Status:</b> ', items('Apply_to_each')?['Status']\r\n)}</p>",
+                                                "emailMessage/Importance": "Normal"
+                                              },
+                                              "host": {
+                                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                                "connectionName": "shared_office365",
+                                                "operationId": "SendEmailV2"
+                                              },
+                                              "authentication": {
+                                                "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']",
+                                                "type": "Raw"
+                                              }
+                                            }
+                                          }
+                                        }
+                                      },
+                                      "expression": {
+                                        "and": [
+                                          {
+                                            "equals": [
+                                              "@items('Apply_to_each')?['Request Category']",
+                                              "Maintenance"
+                                            ]
+                                          }
+                                        ]
+                                      },
+                                      "type": "If"
+                                    }
+                                  }
+                                },
+                                "expression": {
+                                  "and": [
+                                    {
+                                      "equals": [
+                                        "@items('Apply_to_each')?['Request Category']",
+                                        "Marketing"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                "type": "If"
+                              }
+                            }
+                          },
+                          "expression": {
+                            "and": [
+                              {
+                                "equals": [
+                                  "@items('Apply_to_each')?['Request Category']",
+                                  "Equipment"
+                                ]
+                              }
+                            ]
+                          },
+                          "type": "If"
+                        }
+                      }
+                    },
+                    "expression": {
+                      "and": [
+                        {
+                          "equals": [
+                            "@items('Apply_to_each')?['Request Category']",
+                            "IT"
+                          ]
+                        }
+                      ]
+                    },
+                    "type": "If"
+                  }
+                }
+              },
+              "expression": {
+                "and": [
+                  {
+                    "greater": [
+                      "@float(items('Apply_to_each')?['Estimated Cost EUR'])",
+                      500
+                    ]
+                  }
+                ]
+              },
+              "type": "If"
+            }
+          },
+          "runAfter": {
+            "List_rows_present_in_a_table": [
+              "Succeeded"
+            ]
+          },
+          "type": "Foreach"
+        }
+      }
+    },
+    "connectionReferences": {
+      "shared_excelonlinebusiness": {
+        "connectionName": "shared-excelonlinebu-c6d36683-07ef-44cf-8072-06eedb3233ae",
+        "source": "Invoker",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
+        "tier": "NotSpecified",
+        "apiName": "excelonlinebusiness",
+        "isProcessSimpleApiReferenceConversionAlreadyDone": false
+      },
+      "shared_office365": {
+        "connectionName": "shared-office365-4686e4de-4759-47d2-a9d9-74ccc2ea87b0",
+        "source": "Invoker",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_office365",
+        "tier": "NotSpecified",
+        "apiName": "office365",
+        "isProcessSimpleApiReferenceConversionAlreadyDone": false
+      },
+      "shared_approvals": {
+        "connectionName": "shared-approvals-536ab5db-9e47-4f7d-9e72-8211701a75bc",
+        "source": "Invoker",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_approvals",
+        "tier": "NotSpecified",
+        "apiName": "approvals",
+        "isProcessSimpleApiReferenceConversionAlreadyDone": false
+      }
+    },
+    "flowFailureAlertSubscribed": false,
+    "isManaged": false
+  }
+}

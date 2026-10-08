@@ -1,0 +1,7 @@
+﻿Test ID,Scenario,Input,Expected Result
+T01,Low-cost IT request,Status=New; Category=IT; Cost=150,IT notification; no approval
+T02,High-cost IT approved,Status=New; Category=IT; Cost=650; Outcome=Approve,Status=Approved; IT notification
+T03,High-cost IT rejected,Status=New; Category=IT; Cost=650; Outcome=Reject,Status=Rejected; no IT notification
+T04,Already processed request,Status=Approved,Skip
+T05,Marketing request,Status=New; Category=Marketing; Cost=120,Marketing notification
+T06,Maintenance request,Status=New; Category=Maintenance; Cost=80,Maintenance notification
